@@ -91,6 +91,11 @@ extension ObservableType {
         return Just(element: element)
     }
     
+    func buffer(time: Int, count: Int) -> Observable<[Element]> {
+        return Buffer.init(source: self.asObservable(), seconds: time, count: count)
+    }
+    
+    
     
 }
 
@@ -195,6 +200,30 @@ class Map<SourceType, ResultType>: Producer<ResultType> {
         let sub = _source.subscribe(sink)
         
         return (sinkObserver: sink, subscriptionHandlerDispose: sub)
+        
+    }
+    
+}
+
+class Buffer<Element>: Producer<[Element]> {
+    
+    let _source: Observable<Element>
+    let _time: Int
+    let _count: Int
+    
+    init(source: Observable<Element>, seconds: Int, count: Int) {
+        _source = source
+        _time = seconds
+        _count = count
+        super.init()
+    }
+    
+    override func run<Observer>(_ observer: Observer, cancel: Cancelable) -> (sinkObserver: Disposable, subscriptionHandlerDispose: Disposable) where [Element] == Observer.Element, Observer : ObserverType {
+        
+        let coreOB = BufferCoreObserver.init(source: self, observer: observer, cancel: cancel)
+        let subscriptionHandlerDispose = coreOB.run()
+        return (sinkObserver: coreOB, subscriptionHandlerDispose: subscriptionHandlerDispose)
+        
         
     }
     

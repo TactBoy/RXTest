@@ -236,3 +236,63 @@ class AnyObserver<Element>: ObserverType {
         return self
     }
 }
+
+class BufferCoreObserver<Element, Observer: ObserverType>: Sink<Observer>, ObserverType where Observer.Element == [Element] {
+        
+    let _source: Buffer<Element>
+    var _buffer = [Element]()
+    var _windowId = 0
+    
+    init(source: Buffer<Element>, observer: Observer, cancel: Cancelable)  {
+        _source = source
+        super.init(observer: observer, cancel: cancel)
+    }
+    
+    func run() -> Disposable{
+        
+        self.createTime(windowId: self._windowId)
+        return self._source._source.subscribe(self)
+        
+    }
+    
+    func createNextWindowAndPush() {
+        self._windowId += 1
+        let buf = self._buffer
+        self._buffer.removeAll()
+        self.createTime(windowId: self._windowId)
+        self.forwardOn(.next(buf))
+    }
+    
+    func createTime(windowId: Int) {
+        
+        if (windowId != self._windowId) {
+            return
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now().advanced(by: DispatchTimeInterval.seconds(self._source._time))) {
+            
+            if (windowId != self._windowId) {
+                return
+            }
+            
+            self.createNextWindowAndPush()
+            
+        }
+        
+        
+    }
+    
+    func on(_ event: Event<Element>) {
+        switch event {
+        case .next(let ele):
+            self._buffer.append(ele)
+            if (self._buffer.count == self._source._count) {
+                self.createNextWindowAndPush()
+            }
+        default:
+            break
+        }
+    }
+    
+    
+}
